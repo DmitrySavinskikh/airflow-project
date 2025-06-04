@@ -42,11 +42,10 @@ def init_dwh_dag():
             "CREATE SCHEMA IF NOT EXISTS dds;"
         ],
         autocommit=True,
-        conn_id="con_dwh_2024_s034",
+        conn_id="con_dwh_2024_s081",
         split_statements=True
     )
 
-    # Определение порядка выполнения задач
     check_connection_task >> create_schemas
 
 dwh_instance = init_dwh_dag()
