@@ -1,40 +1,52 @@
-import datetime
-import logging
-
+from datetime import datetime
 from airflow import DAG
+from airflow.decorators import dag  # Добавьте этот импорт
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.operators.python import PythonOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
-
-def load_dwh_shell(**kwargs):
-
-    # create stg ods dds wrk schemes
-    ...
-
-dag_default_args = {
-    'owner': 'Savinskikh Dmitry',
-    'email': 'dasavinskikh@edu.hse.ru',
-    'email_on_failure': True,
-    'email_on_retry': False,
-    'retries': 5,
-    'retry_delay': datetime.timedelta(minutes=5)
-}
-
-dag = DAG(
-    default_args=dag_default_args,
-    dag_id="dwh_team_21_load_dwh_shell",
+@dag(
+    dag_id="dwh_team_21_init_dwh",
     schedule=None,
-    start_date=datetime(2025, 1, 1),
+    start_date=datetime(2024, 1, 1),
     catchup=False,
-    description="cteating stg ods dds wrk schemes",
+    description="Инициализация DWH: создание схем ods, stg, dds",
     tags=["team_21"]
 )
+def init_dwh_dag():
 
-LOAD_DWH_SHELL = PythonOperator(
-    dag=dag,
-    task_id="LOAD_DWH_SHELL",
-    python_callable=load_dwh_shell,
-    op_kwargs={...},
-    provide_context=True
-)
+    def check_connection():
+        """Проверка подключения к PostgreSQL с использованием PostgresHook"""
+        hook = PostgresHook(postgres_conn_id="con_dwh_2024_s034")
+        conn = hook.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        result = cursor.fetchone()
+        conn.close()
+        if result[0] != 1:
+            raise ValueError("Connection test failed")
+        print("Connection successful!")
 
-LOAD_DWH_SHELL
+    # Проверка подключения
+    check_connection_task = PythonOperator(
+        task_id='check_connection',
+        python_callable=check_connection
+    )
+
+    # Создание схем
+    create_schemas = SQLExecuteQueryOperator(
+        task_id='create_schemas',
+        sql=[
+            "CREATE SCHEMA IF NOT EXISTS ods;",
+            "CREATE SCHEMA IF NOT EXISTS stg;",
+            "CREATE SCHEMA IF NOT EXISTS dds;"
+        ],
+        autocommit=True,
+        conn_id="con_dwh_2024_s034",
+        split_statements=True
+    )
+
+    # Определение порядка выполнения задач
+    check_connection_task >> create_schemas
+
+dwh_instance = init_dwh_dag()
