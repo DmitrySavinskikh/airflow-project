@@ -17,7 +17,7 @@ def init_dwh_dag():
 
     def check_connection():
         """Проверка подключения к PostgreSQL с использованием PostgresHook"""
-        hook = PostgresHook(postgres_conn_id="con_dwh_2024_s034")
+        hook = PostgresHook(postgres_conn_id="con_dwh_2024_s086")
         conn = hook.get_conn()
         cursor = conn.cursor()
         cursor.execute("SELECT 1")
@@ -42,7 +42,7 @@ def init_dwh_dag():
             "CREATE SCHEMA IF NOT EXISTS dds;"
         ],
         autocommit=True,
-        conn_id="con_dwh_2024_s081",
+        conn_id="con_dwh_2024_s086",
         split_statements=True
     )
 
