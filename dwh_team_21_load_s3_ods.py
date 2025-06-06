@@ -33,7 +33,7 @@ def load_s3_ods_airports():
     file_name = s3_hook.download_file(key=s3_airport_file, bucket_name=s3_buck_nm)
 
     if file_name:
-        postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s081')
+        postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s086')
         curs = postgres_hook.get_conn().cursor()
         with open(file_name, 'r') as f:
             curs.copy_expert(
@@ -46,7 +46,7 @@ def load_s3_ods_kgcc():
     file_name = s3_hook.download_file(key=s3_weather_kgcc, bucket_name=s3_buck_weather)
 
     if file_name:
-        postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s081')
+        postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s086')
         conn = postgres_hook.get_conn()
         curs = conn.cursor()
         with open(file_name, 'r') as f:
@@ -61,7 +61,7 @@ def load_s3_ods_kjar():
     file_name = s3_hook.download_file(key=s3_weather_kjar, bucket_name=s3_buck_weather)
 
     if file_name:
-        postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s081')
+        postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s086')
         conn = postgres_hook.get_conn()
         curs = conn.cursor()
         with open(file_name, 'r') as f:
@@ -76,7 +76,7 @@ def load_s3_ods_klar():
     file_name = s3_hook.download_file(key=s3_weather_klar, bucket_name=s3_buck_weather)
 
     if file_name:
-        postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s081')
+        postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s086')
         conn = postgres_hook.get_conn()
         curs = conn.cursor()
         with open(file_name, 'r') as f:
@@ -91,7 +91,7 @@ def load_s3_ods_kriw():
     file_name = s3_hook.download_file(key=s3_weather_kriw, bucket_name=s3_buck_weather)
 
     if file_name:
-        postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s081')
+        postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s086')
         conn = postgres_hook.get_conn()
         curs = conn.cursor()
         with open(file_name, 'r') as f:
@@ -116,7 +116,7 @@ end = DummyOperator(task_id='end', dag=dag)
 
 airports_CREATE_TBL = PostgresOperator(
     task_id='crt_airports_data_tbl',
-    postgres_conn_id='con_dwh_2024_s081',
+    postgres_conn_id='con_dwh_2024_s086',
     sql="""
     CREATE TABLE IF NOT EXISTS ods.airports_data (
         id INTEGER,
@@ -145,7 +145,7 @@ airports_CREATE_TBL = PostgresOperator(
 
 temperatures_CREATE_TBL = PostgresOperator(
     task_id='crt_temperatures_tbl',
-    postgres_conn_id='con_dwh_2024_s081',
+    postgres_conn_id='con_dwh_2024_s086',
     sql="""
     -- Create table for KGCC station
     CREATE TABLE IF NOT EXISTS ods.weather_kgcc (
