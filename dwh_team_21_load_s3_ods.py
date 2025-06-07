@@ -2,18 +2,18 @@ import datetime
 import logging
 
 from airflow import DAG
-from airflow.operators.postgres_operator import PostgresOperator
-from airflow.operators.dummy_operator import DummyOperator
-from airflow.operators.python_operator import PythonOperator
-from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.operators.dummy import DummyOperator
+from airflow.operators.python import PythonOperator
+from airflow.providers.amazon.aws.operators.s3 import S3Hook
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
 
 s3_buck_nm = 'db01-content'
-s3_airport_file = 'airports/airports/airports_data.csv'
+s3_airport_file = 'airports/airports_data.csv'
 s3_buck_weather = 'gsbdwhdata'
 s3_weather_kgcc = 'weather/dwh_team_21/KGCC.csv'
-s3_weather_kjar = 'weather/dwh_team_21/KJAR.csv'
+s3_weather_kjac = 'weather/dwh_team_21/KJAC.csv'
 s3_weather_klar = 'weather/dwh_team_21/KLAR.csv'
 s3_weather_kriw = 'weather/dwh_team_21/KRIW.csv'
 
@@ -34,12 +34,14 @@ def load_s3_ods_airports():
 
     if file_name:
         postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s086')
-        curs = postgres_hook.get_conn().cursor()
+        conn = postgres_hook.get_conn()
+        curs = conn.cursor()
         with open(file_name, 'r') as f:
             curs.copy_expert(
                 "COPY ods.airports_data FROM STDIN WITH CSV HEADER DELIMITER AS ',' QUOTE '\"'",
                 f
             )
+            conn.commit()
 
 def load_s3_ods_kgcc():
     s3_hook = S3Hook(aws_conn_id='object_storage_yc')
@@ -51,14 +53,14 @@ def load_s3_ods_kgcc():
         curs = conn.cursor()
         with open(file_name, 'r') as f:
             curs.copy_expert(
-                "COPY ods.weather_kgcc FROM STDIN WITH CSV HEADER DELIMITER AS ',' QUOTE '\"'",
+                "COPY ods.weather_kgcc FROM STDIN WITH CSV HEADER DELIMITER AS ';' QUOTE '\"'",
                 f
             )
             conn.commit()
 
-def load_s3_ods_kjar():
+def load_s3_ods_kjac():
     s3_hook = S3Hook(aws_conn_id='object_storage_yc')
-    file_name = s3_hook.download_file(key=s3_weather_kjar, bucket_name=s3_buck_weather)
+    file_name = s3_hook.download_file(key=s3_weather_kjac, bucket_name=s3_buck_weather)
 
     if file_name:
         postgres_hook = PostgresHook(postgres_conn_id='con_dwh_2024_s086')
@@ -66,7 +68,7 @@ def load_s3_ods_kjar():
         curs = conn.cursor()
         with open(file_name, 'r') as f:
             curs.copy_expert(
-                "COPY ods.weather_kjar FROM STDIN WITH CSV HEADER DELIMITER AS ',' QUOTE '\"'",
+                "COPY ods.weather_kjac FROM STDIN WITH CSV HEADER DELIMITER AS ';' QUOTE '\"'",
                 f
             )
             conn.commit()
@@ -81,7 +83,7 @@ def load_s3_ods_klar():
         curs = conn.cursor()
         with open(file_name, 'r') as f:
             curs.copy_expert(
-                "COPY ods.weather_klar FROM STDIN WITH CSV HEADER DELIMITER AS ',' QUOTE '\"'",
+                "COPY ods.weather_klar FROM STDIN WITH CSV HEADER DELIMITER AS ';' QUOTE '\"'",
                 f
             )
             conn.commit()
@@ -96,7 +98,7 @@ def load_s3_ods_kriw():
         curs = conn.cursor()
         with open(file_name, 'r') as f:
             curs.copy_expert(
-                "COPY ods.weather_kriw FROM STDIN WITH CSV HEADER DELIMITER AS ',' QUOTE '\"'",
+                "COPY ods.weather_kriw FROM STDIN WITH CSV HEADER DELIMITER AS ';' QUOTE '\"'",
                 f
             )
             conn.commit()
@@ -105,7 +107,7 @@ dag = DAG(
     default_args=dag_default_args,
     dag_id="dwh_team_21_load_s3_ods",
     schedule=None,
-    start_date=datetime(2025, 1, 1),
+    start_date=datetime.datetime(2025, 1, 1),
     catchup=False,
     description="extraction data from s3 to ods",
     tags=["team_21"]
@@ -114,105 +116,109 @@ dag = DAG(
 start = DummyOperator(task_id='start', dag=dag)
 end = DummyOperator(task_id='end', dag=dag)
 
-airports_CREATE_TBL = PostgresOperator(
+airports_CREATE_TBL = SQLExecuteQueryOperator(
     task_id='crt_airports_data_tbl',
-    postgres_conn_id='con_dwh_2024_s086',
+    conn_id='con_dwh_2024_s086',
     sql="""
     CREATE TABLE IF NOT EXISTS ods.airports_data (
-        id INTEGER,
-        ident VARCHAR(50),
-        type VARCHAR(50),
-        name VARCHAR(255),
-        latitude_deg DECIMAL(10, 6),
-        longitude_deg DECIMAL(10, 6),
-        elevation_ft INTEGER,
-        continent VARCHAR(2),
-        iso_country VARCHAR(2),
-        iso_region VARCHAR(10),
-        municipality VARCHAR(255),
-        scheduled_service VARCHAR(3),
-        icao_code VARCHAR(4),
-        iata_code VARCHAR(3),
-        gps_code VARCHAR(10),
-        local_code VARCHAR(10),
-        home_link VARCHAR(255),
-        wikipedia_link VARCHAR(255),
-        keywords TEXT
+        id INTEGER default null,
+        ident TEXT default null,
+        type TEXT default null,
+        name TEXT default null,
+        latitude_deg DECIMAL(10, 6) default null,
+        longitude_deg DECIMAL(10, 6) default null,
+        elevation_ft INTEGER default null,
+        continent TEXT default null,
+        iso_country TEXT default null,
+        iso_region TEXT default null,
+        municipality TEXT default null,
+        scheduled_service TEXT default null,
+        icao_code TEXT default null,
+        iata_code TEXT default null,
+        gps_code TEXT default null,
+        local_code TEXT default null,
+        home_link TEXT default null,
+        wikipedia_link TEXT default null,
+        keywords TEXT default null
     );
     """,
     dag=dag
 )
 
-temperatures_CREATE_TBL = PostgresOperator(
+temperatures_CREATE_TBL = SQLExecuteQueryOperator(
     task_id='crt_temperatures_tbl',
-    postgres_conn_id='con_dwh_2024_s086',
+    conn_id='con_dwh_2024_s086',
     sql="""
     -- Create table for KGCC station
     CREATE TABLE IF NOT EXISTS ods.weather_kgcc (
-        local_time TIMESTAMP,
-        temperature DECIMAL(4,1),
-        pressure_p0 DECIMAL(5,1),
-        pressure DECIMAL(5,1),
-        humidity INTEGER,
-        wind_direction VARCHAR(50),
-        wind_speed INTEGER,
-        wind_speed_10min INTEGER,
-        weather_phenomena VARCHAR(100),
-        weather_phenomena_2 VARCHAR(100),
-        cloud_coverage VARCHAR(100),
-        visibility DECIMAL(4,1),
-        dew_point DECIMAL(4,1)
+        local_time text default null,
+        T decimal(4,1) default null,
+        P0 decimal(5,1) default null,
+        P decimal(5,1) default null,
+        U integer default null,
+        DD text default null,
+        Ff integer default null,
+        ff10 text default null,
+        WW text default null,
+        W_W_ text default null,
+        c text default null,
+        VV decimal(4,1) default null,
+        Td decimal(4,1) default null,
+        col14 text default null
     );
 
-    -- Create table for KJAR station
-    CREATE TABLE IF NOT EXISTS ods.weather_kjar (
-        local_time TIMESTAMP,
-        temperature DECIMAL(4,1),
-        pressure_p0 DECIMAL(5,1),
-        pressure DECIMAL(5,1),
-        humidity INTEGER,
-        wind_direction VARCHAR(50),
-        wind_speed INTEGER,
-        wind_speed_10min INTEGER,
-        weather_phenomena VARCHAR(100),
-        weather_phenomena_2 VARCHAR(100),
-        cloud_coverage VARCHAR(100),
-        visibility DECIMAL(4,1),
-        dew_point DECIMAL(4,1)
+    -- Create table for KJAC station
+    CREATE TABLE IF NOT EXISTS ods.weather_kjac (
+        local_time text default null,
+        T decimal(4,1) default null,
+        P0 decimal(5,1) default null,
+        P decimal(5,1) default null,
+        U integer default null,
+        DD text default null,
+        Ff integer default null,
+        ff10 text default null,
+        WW text default null,
+        W_W_ text default null,
+        c text default null,
+        VV decimal(4,1) default null,
+        Td decimal(4,1) default null,
+        col14 text default null
     );
 
     -- Create table for KLAR station
     CREATE TABLE IF NOT EXISTS ods.weather_klar (
-        local_time TIMESTAMP,
-        temperature DECIMAL(4,1),
-        pressure_p0 DECIMAL(5,1),
-        pressure DECIMAL(5,1),
-        humidity INTEGER,
-        wind_direction VARCHAR(50),
-        wind_speed INTEGER,
-        wind_speed_10min INTEGER,
-        weather_phenomena VARCHAR(100),
-        weather_phenomena_2 VARCHAR(100),
-        cloud_coverage VARCHAR(100),
-        visibility DECIMAL(4,1),
-        dew_point DECIMAL(4,1)
+        local_time text default null,
+        T decimal(4,1) default null,
+        P0 decimal(5,1) default null,
+        P decimal(5,1) default null,
+        U integer default null,
+        DD text default null,
+        Ff integer default null,
+        ff10 text default null,
+        WW text default null,
+        W_W_ text default null,
+        c text default null,
+        VV decimal(4,1) default null,
+        Td decimal(4,1) default null,
+        col14 text default null
     );
 
     -- Create table for KRIW station
     CREATE TABLE IF NOT EXISTS ods.weather_kriw (
-        local_time TIMESTAMP,
-        temperature DECIMAL(4,1),
-        pressure_p0 DECIMAL(5,1),
-        pressure DECIMAL(5,1),
-        humidity INTEGER,
-        wind_direction VARCHAR(50),
-        wind_speed INTEGER,
-        wind_speed_10min INTEGER,
-        weather_phenomena VARCHAR(100),
-        weather_phenomena_2 VARCHAR(100),
-        cloud_coverage VARCHAR(100),
-        visibility DECIMAL(4,1),
-        dew_point DECIMAL(4,1)
+        local_time text default null,
+        T decimal(4,1) default null,
+        P0 decimal(5,1) default null,
+        P decimal(5,1) default null,
+        U integer default null,
+        DD text default null,
+        Ff integer default null,
+        ff10 text default null,
+        WW text default null,
+        W_W_ text default null,
+        c text default null,
+        VV decimal(4,1) default null,
+        Td decimal(4,1) default null,
+        col14 text default null
     );
     """,
     dag=dag
@@ -220,7 +226,7 @@ temperatures_CREATE_TBL = PostgresOperator(
 
 airports_LOAD_S3_ODS = PythonOperator(
     dag=dag,
-    task_id=f"load_aiports_data",
+    task_id=f"load_airports_data",
     python_callable=load_s3_ods_airports,
     provide_context=True
 )
@@ -232,10 +238,10 @@ temperatures_kgcc_LOAD_S3_ODS = PythonOperator(
     provide_context=True
 )
 
-temperatures_kjar_LOAD_S3_ODS = PythonOperator(
+temperatures_kjac_LOAD_S3_ODS = PythonOperator(
     dag=dag,
-    task_id=f"load_temperatures_data_kjar",
-    python_callable=load_s3_ods_kjar,
+    task_id=f"load_temperatures_data_kjac",
+    python_callable=load_s3_ods_kjac,
     provide_context=True
 )
 
@@ -254,4 +260,4 @@ temperatures_kriw_LOAD_S3_ODS = PythonOperator(
 )
 
 
-start >> airports_CREATE_TBL >> airports_LOAD_S3_ODS >> temperatures_CREATE_TBL >> temperatures_kgcc_LOAD_S3_ODS >> temperatures_kjar_LOAD_S3_ODS >> temperatures_klar_LOAD_S3_ODS >> temperatures_kriw_LOAD_S3_ODS >> end
+start >> airports_CREATE_TBL >> airports_LOAD_S3_ODS >> temperatures_CREATE_TBL >> temperatures_kgcc_LOAD_S3_ODS >> temperatures_kjac_LOAD_S3_ODS >> temperatures_klar_LOAD_S3_ODS >> temperatures_kriw_LOAD_S3_ODS >> end
