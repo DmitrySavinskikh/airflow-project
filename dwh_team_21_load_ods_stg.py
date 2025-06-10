@@ -41,21 +41,8 @@ create_stg_tables = SQLExecuteQueryOperator(
         ident TEXT default null,
         type TEXT default null,
         name TEXT default null,
-        latitude_deg DECIMAL(10, 6) default null,
-        longitude_deg DECIMAL(10, 6) default null,
-        elevation_ft INTEGER default null,
-        continent TEXT default null,
-        iso_country TEXT default null,
-        iso_region TEXT default null,
-        municipality TEXT default null,
-        scheduled_service TEXT default null,
         icao_code TEXT default null,
-        iata_code TEXT default null,
-        gps_code TEXT default null,
-        local_code TEXT default null,
-        home_link TEXT default null,
-        wikipedia_link TEXT default null,
-        keywords TEXT default null
+        iata_code TEXT default null
     );
     
     -- Create weather tables in STG with transformed structure
@@ -130,21 +117,8 @@ load_airports = SQLExecuteQueryOperator(
         ident,
         type,
         name,
-        latitude_deg,
-        longitude_deg,
-        elevation_ft,
-        continent,
-        iso_country,
-        iso_region,
-        municipality,
-        scheduled_service,
         icao_code,
-        iata_code,
-        gps_code,
-        local_code,
-        home_link,
-        wikipedia_link,
-        keywords
+        iata_code
     FROM ods.airports_data;
     """,
     dag=dag
