@@ -49,7 +49,7 @@ create_stg_tables = SQLExecuteQueryOperator(
     CREATE TABLE IF NOT EXISTS stg.weather_kgcc (
         local_time TIMESTAMP default null,
         air_temperature decimal(4,1) default null,
-        pressure_groud decimal(5,1) default null,
+        pressure_ground decimal(5,1) default null,
         pressure_sea decimal(5,1) default null,
         humidity integer default null,
         mean_wind text default null,
@@ -63,7 +63,7 @@ create_stg_tables = SQLExecuteQueryOperator(
     CREATE TABLE IF NOT EXISTS stg.weather_kjac (
         local_time TIMESTAMP default null,
         air_temperature decimal(4,1) default null,
-        pressure_groud decimal(5,1) default null,
+        pressure_ground decimal(5,1) default null,
         pressure_sea decimal(5,1) default null,
         humidity integer default null,
         mean_wind text default null,
@@ -77,7 +77,7 @@ create_stg_tables = SQLExecuteQueryOperator(
     CREATE TABLE IF NOT EXISTS stg.weather_klar (
         local_time TIMESTAMP default null,
         air_temperature decimal(4,1) default null,
-        pressure_groud decimal(5,1) default null,
+        pressure_ground decimal(5,1) default null,
         pressure_sea decimal(5,1) default null,
         humidity integer default null,
         mean_wind text default null,
@@ -91,7 +91,7 @@ create_stg_tables = SQLExecuteQueryOperator(
     CREATE TABLE IF NOT EXISTS stg.weather_kriw (
         local_time TIMESTAMP default null,
         air_temperature decimal(4,1) default null,
-        pressure_groud decimal(5,1) default null,
+        pressure_ground decimal(5,1) default null,
         pressure_sea decimal(5,1) default null,
         humidity integer default null,
         mean_wind text default null,
