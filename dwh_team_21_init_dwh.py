@@ -40,7 +40,8 @@ def init_dwh_dag():
             "CREATE SCHEMA IF NOT EXISTS ods;",
             "CREATE SCHEMA IF NOT EXISTS stg;",
             "CREATE SCHEMA IF NOT EXISTS dds;",
-            "CREATE SCHEMA IF NOT EXISTS dds_dict;"
+            "CREATE SCHEMA IF NOT EXISTS dds_dict;",
+            "CREATE SCHEMA IF NOT EXISTS dm;"
         ],
         autocommit=True,
         conn_id="con_dwh_2024_s086",
