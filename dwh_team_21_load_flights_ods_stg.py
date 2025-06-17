@@ -24,19 +24,25 @@ def load_flights_to_stg_dag():
         sql = """
         DROP TABLE IF EXISTS stg.flights;
         CREATE TABLE stg.flights (
+            flight_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            carrier_flight_num VARCHAR(10),
             flight_date DATE,
-            carrier_code VARCHAR(10),
-            origin_code VARCHAR(10),
-            dest_code VARCHAR(10),
-            scheduled_dep_time TIME,
-            actual_dep_time TIME,
+            scheduled_dep_tm TIMESTAMPTZ,
+            actual_dep_tm TIMESTAMPTZ,
+            origin_airport_dk VARCHAR(10),
+            dest_airport_dk VARCHAR(10),
+            carrier_code VARCHAR(5),
+            distance_miles INTEGER,
             dep_delay_min INTEGER,
-            scheduled_arr_time TIME,
-            actual_arr_time TIME,
             arr_delay_min INTEGER,
-            distance INTEGER,
+            carrier_delay_min INTEGER,
             weather_delay_min INTEGER,
-            processed_dttm TIMESTAMPTZ
+            nas_delay_min INTEGER,
+            security_delay_min INTEGER,
+            late_aircraft_delay_min INTEGER,
+            wheels_off_tm TIMESTAMPTZ,
+            wheels_on_tm TIMESTAMPTZ,
+            processed_dttm TIMESTAMPTZ DEFAULT NOW()
         );
         """
         pg_hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
@@ -45,23 +51,46 @@ def load_flights_to_stg_dag():
     @task
     def transform_and_load_to_stg():
         sql = """
-        INSERT INTO stg.flights
-        SELECT DISTINCT
-            DATE(flight_datetime) AS flight_date,
+        INSERT INTO stg.flights (
+            carrier_flight_num, 
+            flight_date, 
+            scheduled_dep_tm, 
+            actual_dep_tm, 
+            origin_airport_dk, 
+            dest_airport_dk, 
+            carrier_code, 
+            distance_miles, 
+            dep_delay_min, 
+            arr_delay_min, 
+            carrier_delay_min, 
+            weather_delay_min, 
+            nas_delay_min, 
+            security_delay_min, 
+            late_aircraft_delay_min, 
+            wheels_off_tm, 
+            wheels_on_tm, 
+            processed_dttm)
+        SELECT distinct
+            carrier_flight_num,
+            DATE(flight_dt) AS flight_date,
+            cast(scheduled_dep_tm as timestamp),
+            cast(actual_dep_tm as timestamp),
+            origin_code as origin_airport_dk,
+            dest_code as dest_airport_dk,
             carrier_code,
-            origin_code,
-            dest_code,
-            scheduled_dep_time,
-            actual_dep_time,
+            distance as distance_miles,
             dep_delay_min,
-            scheduled_arr_time,
-            actual_arr_time,
             arr_delay_min,
-            distance,
+            carrier_delay_min,
             weather_delay_min,
+            nas_delay_min,
+            security_delay_min,
+            late_aircraft_delay_min,
+            cast(wheels_off_tm as timestamp),
+            cast(wheels_on_tm as timestamp),
             NOW() AS processed_dttm
         FROM ods.flights
-        WHERE flight_datetime BETWEEN '2024-01-01' AND '2024-06-30';
+        WHERE flight_dt BETWEEN '2024-01-01' AND '2024-06-30';
         """
         pg_hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
         pg_hook.run(sql)

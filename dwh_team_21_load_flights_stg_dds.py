@@ -7,8 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-DAG_ID = 'dwh_team_21_flights_dds'
-DEPENDENT_DAG_ID = 'dwh_team_21_load_stg_dds'
+DAG_ID = 'dwh_team_21_load_flights_stg_dds'
 PG_CONN_ID = 'con_dwh_2024_s086'
 TEAM_AIRPORTS = ('JAC', 'LAR', 'GCC', 'RIW')
 MAX_RETRIES = 3
@@ -28,58 +27,11 @@ MAX_RETRIES = 3
 )
 def flights_to_dds_dag():
 
-    @task(retries=MAX_RETRIES, retry_delay=timedelta(minutes=2))
-    def verify_dependencies():
-        """Проверяет наличие всех необходимых таблиц и данных"""
-        hook = PostgresHook(postgres_conn_id=PG_CONN_ID)
-        try:
-            with hook.get_conn() as conn:
-                with conn.cursor() as cur:
-                    # Проверка существования таблицы аэропортов
-                    cur.execute("""
-                    SELECT EXISTS (
-                        SELECT 1 FROM information_schema.tables 
-                        WHERE table_schema = 'dds_dict' 
-                        AND table_name = 'dict_airports'
-                    );
-                    """)
-                    table_exists = cur.fetchone()[0]
-                    
-                    if not table_exists:
-                        logger.warning("Таблица dds_dict.dict_airports не найдена")
-                        raise ValueError("Таблица аэропортов не найдена")
-                    
-                    # Проверка наличия нужных аэропортов
-                    cur.execute("""
-                    SELECT iata_code FROM dds_dict.dict_airports
-                    WHERE iata_code IN %s;
-                    """, (tuple(TEAM_AIRPORTS),))
-                    
-                    found_airports = {row[0] for row in cur.fetchall()}
-                    missing_airports = set(TEAM_AIRPORTS) - found_airports
-                    
-                    if missing_airports:
-                        logger.warning(f"Отсутствуют данные для аэропортов: {missing_airports}")
-                        raise ValueError(f"Отсутствуют данные для аэропортов: {missing_airports}")
-                    
-                    return True
-                    
-        except Exception as e:
-            logger.error(f"Ошибка при проверке зависимостей: {str(e)}")
-            raise
-
-    trigger_dependent_dag = TriggerDagRunOperator(
-        task_id='trigger_dependent_dag',
-        trigger_dag_id=DEPENDENT_DAG_ID,
-        wait_for_completion=True,
-        poke_interval=60,
-        reset_dag_run=True
-    )
-
     @task
     def create_dds_schema():
-        sql = """        
-        CREATE TABLE IF NOT EXISTS dds.completed_flights (
+        sql = """       
+        DROP TABLE IF EXISTS dds.completed_flights;
+        CREATE TABLE dds.completed_flights (
             flight_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             carrier_flight_num VARCHAR(10),
             flight_date DATE,
@@ -88,7 +40,6 @@ def flights_to_dds_dag():
             origin_airport_dk VARCHAR(10),
             dest_airport_dk VARCHAR(10),
             carrier_code VARCHAR(5),
-            tail_num VARCHAR(10),
             distance_miles INTEGER,
             dep_delay_min INTEGER,
             arr_delay_min INTEGER,
@@ -102,8 +53,9 @@ def flights_to_dds_dag():
             processed_dttm TIMESTAMPTZ DEFAULT NOW(),
             CONSTRAINT uniq_flight UNIQUE (carrier_flight_num, scheduled_dep_tm, origin_airport_dk)
         );
-        
-        CREATE TABLE IF NOT EXISTS dds.cancelled_flights (
+
+        DROP TABLE IF EXISTS dds.cancelled_flights;
+        CREATE TABLE dds.cancelled_flights (
             cancellation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             carrier_flight_num VARCHAR(10),
             scheduled_dep_tm TIMESTAMPTZ,
@@ -130,10 +82,61 @@ def flights_to_dds_dag():
     @task
     def load_completed_flights():
         sql = """
-        INSERT INTO dds.completed_flights
-        select
-            ...
-        from stg.flights
+        INSERT INTO dds.completed_flights (
+            carrier_flight_num, 
+            flight_date,
+            scheduled_dep_tm, 
+            actual_dep_tm,
+            origin_airport_dk, 
+            dest_airport_dk,
+            carrier_code, 
+            tail_num, 
+            distance_miles,
+            dep_delay_min, 
+            arr_delay_min,
+            carrier_delay_min, 
+            weather_delay_min,
+            nas_delay_min, 
+            security_delay_min, 
+            late_aircraft_min,
+            wheels_off_tm, 
+            wheels_on_tm
+        )
+        SELECT
+            f.carrier_flight_number,
+            f.flight_dt::DATE,
+            (f.flight_dt || ' ' || f.scheduled_dep_tm)::timestamp AT TIME ZONE COALESCE(a.timezone, 'UTC'),
+            (f.flight_dt || ' ' || f.actual_dep_tm)::timestamp AT TIME ZONE COALESCE(a.timezone, 'UTC'),
+            f.origin_code,
+            f.dest_code,
+            f.carrier_code,
+            f.tail_num,
+            f.distance,
+            f.dep_delay_min,
+            f.arr_delay_min,
+            COALESCE(f.carrier_delay_min, 0),
+            COALESCE(f.weather_delay_min, 0),
+            COALESCE(f.nas_delay_min, 0),
+            COALESCE(f.security_delay_min, 0),
+            COALESCE(f.late_aircraft_min, 0),
+            (f.flight_dt || ' ' || f.weels_off_tm)::timestamp AT TIME ZONE COALESCE(a.timezone, 'UTC'),
+            (f.flight_dt || ' ' || f.weels_on_tm)::timestamp AT TIME ZONE COALESCE(a.timezone, 'UTC')
+        FROM stg.flights f
+        LEFT JOIN dds_dict.dict_airports a ON a.iata_code = f.origin_code
+        WHERE f.cancelled_flg = 'N'
+            AND f.origin_code IN ('JAC', 'LAR', 'GCC', 'RIW')
+            ON CONFLICT (carrier_flight_num, scheduled_dep_tm, origin_airport_dk) 
+            DO UPDATE SET
+            actual_dep_tm = EXCLUDED.actual_dep_tm,
+            wheels_off_tm = EXCLUDED.wheels_off_tm,
+            wheels_on_tm = EXCLUDED.wheels_on_tm,
+            arr_delay_min = EXCLUDED.arr_delay_min,
+            carrier_delay_min = EXCLUDED.carrier_delay_min,
+            weather_delay_min = EXCLUDED.weather_delay_min,
+            nas_delay_min = EXCLUDED.nas_delay_min,
+            security_delay_min = EXCLUDED.security_delay_min,
+            late_aircraft_min = EXCLUDED.late_aircraft_min,
+            processed_dttm = NOW();
         """
         hook = PostgresHook(postgres_conn_id=PG_CONN_ID)
         hook.run(sql, parameters=(tuple(TEAM_AIRPORTS),))
@@ -141,21 +144,31 @@ def flights_to_dds_dag():
     @task
     def load_cancelled_flights():
         sql = """
-        INSERT INTO dds.cancelled_flights (...)
-        -- Ваш SQL запрос здесь
+        INSERT INTO dds.cancelled_flights (
+            carrier_flight_num, 
+            scheduled_dep_tm,
+            origin_airport_dk, 
+            dest_airport_dk,
+            carrier_code, 
+            cancellation_code
+        )
+        SELECT
+            f.carrier_flight_number,
+            (f.flight_dt || ' ' || f.scheduled_dep_tm)::timestamp AT TIME ZONE COALESCE(a.timezone, 'UTC'),
+            f.origin_code,
+            f.dest_code,
+            f.carrier_code,
+            f.cancellation_code
+        FROM stg.flights f
+        LEFT JOIN dds_dict.dict_airports a ON a.iata_code = f.origin_code
+        WHERE f.cancelled_flg = 'Y'
+            AND f.origin_code IN ('JAC', 'LAR', 'GCC', 'RIW')
+            ON CONFLICT (carrier_flight_num, scheduled_dep_tm, origin_airport_dk) 
+            DO NOTHING;
         """
         hook = PostgresHook(postgres_conn_id=PG_CONN_ID)
         hook.run(sql, parameters=(tuple(TEAM_AIRPORTS),))
 
-    # Определение workflow
-    verify_task = verify_dependencies()
-    trigger_task = trigger_dependent_dag
-    
-    # Если verify_dependencies завершается с ошибкой, запускаем trigger_dependent_dag
-    verify_task >> trigger_task
-    trigger_task >> verify_dependencies.retry()
-    
-    # При успешной проверке продолжаем выполнение
-    verify_task >> create_dds_schema() >> [load_completed_flights(), load_cancelled_flights()]
+    create_dds_schema() >> load_completed_flights() >> load_cancelled_flights()
 
 flights_dag = flights_to_dds_dag()
