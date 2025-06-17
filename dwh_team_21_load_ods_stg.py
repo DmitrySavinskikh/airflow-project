@@ -111,7 +111,7 @@ load_airports = SQLExecuteQueryOperator(
     conn_id='con_dwh_2024_s086',
     sql="""
     TRUNCATE TABLE stg.airports_data;
-    INSERT INTO stg.airports_data
+    INSERT INTO stg.airports_data (id, ident, type, name, icao_code, iata_code)
     SELECT DISTINCT
         id,
         ident,
