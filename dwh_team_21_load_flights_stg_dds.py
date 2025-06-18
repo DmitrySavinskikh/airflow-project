@@ -1,8 +1,6 @@
 from datetime import datetime, timedelta
 from airflow.decorators import dag, task
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from airflow.models import TaskInstance
 import logging
 
 logger = logging.getLogger(__name__)
@@ -58,7 +56,7 @@ def flights_to_dds_dag():
         CREATE TABLE dds.cancelled_flights (
             cancellation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             carrier_flight_num VARCHAR(10),
-            scheduled_dep_tm TIMESTAMPTZ,
+            scheduled_dep_tm TIMESTAMP,
             origin_airport_dk VARCHAR(10),
             dest_airport_dk VARCHAR(10),
             carrier_code VARCHAR(5),
@@ -90,7 +88,6 @@ def flights_to_dds_dag():
             origin_airport_dk, 
             dest_airport_dk,
             carrier_code, 
-            tail_num, 
             distance_miles,
             dep_delay_min, 
             arr_delay_min,
@@ -103,40 +100,51 @@ def flights_to_dds_dag():
             wheels_on_tm
         )
         SELECT
-            f.carrier_flight_number,
-            f.flight_dt::DATE,
-            (f.flight_dt || ' ' || f.scheduled_dep_tm)::timestamp AT TIME ZONE COALESCE(a.timezone, 'UTC'),
-            (f.flight_dt || ' ' || f.actual_dep_tm)::timestamp AT TIME ZONE COALESCE(a.timezone, 'UTC'),
-            f.origin_code,
-            f.dest_code,
+            f.carrier_flight_num,
+            f.flight_date::DATE,
+            concat(flight_date::text, 
+                        ' ', 
+                        case when length(div(scheduled_dep_tm, 100)::text) = 1 then concat('0', div(scheduled_dep_tm, 100)::text) else div(scheduled_dep_tm, 100)::text end, 
+                        ':', 
+                        case when length(mod(scheduled_dep_tm, 100)::text) = 1 then '00' else mod(scheduled_dep_tm, 100)::text end,
+                        ':00.000'
+                )::timestamp as sched_dttm_local,
+            concat(flight_date::text, 
+                        ' ', 
+                        case when length(div(actual_dep_tm, 100)::text) = 1 then concat('0', div(actual_dep_tm, 100)::text) else div(actual_dep_tm, 100)::text end, 
+                        ':', 
+                        case when length(mod(actual_dep_tm, 100)::text) = 1 then '00' else mod(actual_dep_tm, 100)::text end,
+                        ':00.000'
+                )::timestamp as actual_dttm_local,
+            f.origin_airport_dk,
+            f.dest_airport_dk,
             f.carrier_code,
-            f.tail_num,
-            f.distance,
+            f.distance_miles,
             f.dep_delay_min,
             f.arr_delay_min,
             COALESCE(f.carrier_delay_min, 0),
             COALESCE(f.weather_delay_min, 0),
             COALESCE(f.nas_delay_min, 0),
             COALESCE(f.security_delay_min, 0),
-            COALESCE(f.late_aircraft_min, 0),
-            (f.flight_dt || ' ' || f.weels_off_tm)::timestamp AT TIME ZONE COALESCE(a.timezone, 'UTC'),
-            (f.flight_dt || ' ' || f.weels_on_tm)::timestamp AT TIME ZONE COALESCE(a.timezone, 'UTC')
+            COALESCE(f.late_aircraft_delay_min, 0),
+            concat(flight_date::text, 
+                ' ', 
+                case when length(div(wheels_off_tm, 100)::text) = 1 then concat('0', div(wheels_off_tm, 100)::text) else div(wheels_off_tm, 100)::text end, 
+                ':', 
+                case when length(mod(wheels_off_tm, 100)::text) = 1 then '00' else mod(wheels_off_tm, 100)::text end,
+                ':00.000'
+            )::timestamp as wheels_off_dttm,
+            concat(flight_date::text, 
+                ' ', 
+                case when length(div(wheels_on_tm, 100)::text) = 1 then concat('0', div(wheels_on_tm, 100)::text) else div(wheels_on_tm, 100)::text end, 
+                ':', 
+                case when length(mod(wheels_on_tm, 100)::text) = 1 then '00' else mod(wheels_on_tm, 100)::text end,
+                ':00.000'
+            )::timestamp as wheels_on_dttm
         FROM stg.flights f
-        LEFT JOIN dds_dict.dict_airports a ON a.iata_code = f.origin_code
-        WHERE f.cancelled_flg = 'N'
-            AND f.origin_code IN ('JAC', 'LAR', 'GCC', 'RIW')
-            ON CONFLICT (carrier_flight_num, scheduled_dep_tm, origin_airport_dk) 
-            DO UPDATE SET
-            actual_dep_tm = EXCLUDED.actual_dep_tm,
-            wheels_off_tm = EXCLUDED.wheels_off_tm,
-            wheels_on_tm = EXCLUDED.wheels_on_tm,
-            arr_delay_min = EXCLUDED.arr_delay_min,
-            carrier_delay_min = EXCLUDED.carrier_delay_min,
-            weather_delay_min = EXCLUDED.weather_delay_min,
-            nas_delay_min = EXCLUDED.nas_delay_min,
-            security_delay_min = EXCLUDED.security_delay_min,
-            late_aircraft_min = EXCLUDED.late_aircraft_min,
-            processed_dttm = NOW();
+        LEFT JOIN dds_dict.dict_airports a ON a.iata_code = f.origin_airport_dk
+        WHERE f.cancelled_flag is false
+            AND f.origin_airport_dk IN ('JAC', 'LAR', 'GCC', 'RIW');
         """
         hook = PostgresHook(postgres_conn_id=PG_CONN_ID)
         hook.run(sql, parameters=(tuple(TEAM_AIRPORTS),))

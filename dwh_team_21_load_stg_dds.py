@@ -35,7 +35,8 @@ create_dds_airports = SQLExecuteQueryOperator(
     conn_id='con_dwh_2024_s086',
     sql="""
     -- Create airports table in DDS (only useful fields)
-    CREATE TABLE IF NOT EXISTS dds_dict.dict_airports (
+    DROP TABLE IF EXISTS dds_dict.dict_airports;
+    CREATE TABLE dds_dict.dict_airports (
         id INTEGER default null,
         ident TEXT default null,
         type TEXT default null,
@@ -69,7 +70,8 @@ create_dds_weather = SQLExecuteQueryOperator(
     conn_id='con_dwh_2024_s086',
     sql="""
     -- Create weather table in DDS (added scd2);
-    CREATE TABLE IF NOT EXISTS dds.h2_weather (
+    DROP TABLE IF EXISTS dds.h2_weather
+    CREATE TABLE dds.h2_weather (
         hash_key TEXT PRIMARY KEY,
         airport_rk TEXT,
         air_temperature INTEGER,
@@ -96,7 +98,6 @@ load_dds_weather = SQLExecuteQueryOperator(
     task_id='load_dds_weather',
     conn_id='con_dwh_2024_s086',
     sql="""
-    truncate table dds.h2_weather;
     with scd2_weather_kgcc as (
 select 
 	'KGCC' as airport_rk,
