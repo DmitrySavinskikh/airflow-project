@@ -28,15 +28,14 @@ dag = DAG(
     tags=["team_21"]
 )
 
-start = DummyOperator(task_id='start', dag=dag)
-end = DummyOperator(task_id='end', dag=dag)
-
+# create all stg tables
 create_stg_tables = SQLExecuteQueryOperator(
     task_id='create_stg_tables',
     conn_id='con_dwh_2024_s086',
     sql="""
     -- Create airports table in STG (same structure as ODS)
-    CREATE TABLE IF NOT EXISTS stg.airports_data (
+    DROP TABLE IF EXISTS stg.airports_data;
+    CREATE TABLE stg.airports_data (
         id INTEGER default null,
         ident TEXT default null,
         type TEXT default null,
@@ -46,7 +45,8 @@ create_stg_tables = SQLExecuteQueryOperator(
     );
     
     -- Create weather tables in STG with transformed structure
-    CREATE TABLE IF NOT EXISTS stg.weather_kgcc (
+    DROP TABLE IF EXISTS stg.weather_kgcc;
+    CREATE TABLE stg.weather_kgcc (
         local_time TIMESTAMP default null,
         air_temperature decimal(4,1) default null,
         pressure_ground decimal(5,1) default null,
@@ -60,7 +60,8 @@ create_stg_tables = SQLExecuteQueryOperator(
         horiz_vision decimal(4,1) default null
     );
 
-    CREATE TABLE IF NOT EXISTS stg.weather_kjac (
+    DROP TABLE IF EXISTS stg.weather_kjac;
+    CREATE TABLE stg.weather_kjac (
         local_time TIMESTAMP default null,
         air_temperature decimal(4,1) default null,
         pressure_ground decimal(5,1) default null,
@@ -74,7 +75,8 @@ create_stg_tables = SQLExecuteQueryOperator(
         horiz_vision decimal(4,1) default null
     );
 
-    CREATE TABLE IF NOT EXISTS stg.weather_klar (
+    DROP TABLE IF EXISTS stg.weather_klar;
+    CREATE TABLE stg.weather_klar (
         local_time TIMESTAMP default null,
         air_temperature decimal(4,1) default null,
         pressure_ground decimal(5,1) default null,
@@ -88,7 +90,8 @@ create_stg_tables = SQLExecuteQueryOperator(
         horiz_vision decimal(4,1) default null
     );
 
-    CREATE TABLE IF NOT EXISTS stg.weather_kriw (
+    DROP TABLE IF EXISTS stg.weather_kriw;
+    CREATE TABLE stg.weather_kriw (
         local_time TIMESTAMP default null,
         air_temperature decimal(4,1) default null,
         pressure_ground decimal(5,1) default null,
@@ -105,12 +108,11 @@ create_stg_tables = SQLExecuteQueryOperator(
     dag=dag
 )
 
-# Task to load airports data (unchanged)
+# task to load airports data
 load_airports = SQLExecuteQueryOperator(
     task_id='load_airports_data',
     conn_id='con_dwh_2024_s086',
     sql="""
-    TRUNCATE TABLE stg.airports_data;
     INSERT INTO stg.airports_data (id, ident, type, name, icao_code, iata_code)
     SELECT DISTINCT
         id,
@@ -124,12 +126,11 @@ load_airports = SQLExecuteQueryOperator(
     dag=dag
 )
 
-# Updated tasks to load weather data with seconds in timestamp format
+# tasks to load weather data with seconds in timestamp format
 load_weather_kgcc = SQLExecuteQueryOperator(
     task_id='load_weather_kgcc',
     conn_id='con_dwh_2024_s086',
     sql="""
-    TRUNCATE TABLE stg.weather_kgcc;
     INSERT INTO stg.weather_kgcc
     SELECT DISTINCT
         TO_TIMESTAMP(local_time, 'DD.MM.YYYY HH24:MI:SS') as local_time,
@@ -143,7 +144,6 @@ load_weather_kjac = SQLExecuteQueryOperator(
     task_id='load_weather_kjac',
     conn_id='con_dwh_2024_s086',
     sql="""
-    TRUNCATE TABLE stg.weather_kjac;
     INSERT INTO stg.weather_kjac
     SELECT DISTINCT
         TO_TIMESTAMP(local_time, 'DD.MM.YYYY HH24:MI:SS') as local_time,
@@ -157,7 +157,6 @@ load_weather_klar = SQLExecuteQueryOperator(
     task_id='load_weather_klar',
     conn_id='con_dwh_2024_s086',
     sql="""
-    TRUNCATE TABLE stg.weather_klar;
     INSERT INTO stg.weather_klar
     SELECT DISTINCT
         TO_TIMESTAMP(local_time, 'DD.MM.YYYY HH24:MI:SS') as local_time,
@@ -171,7 +170,6 @@ load_weather_kriw = SQLExecuteQueryOperator(
     task_id='load_weather_kriw',
     conn_id='con_dwh_2024_s086',
     sql="""
-    TRUNCATE TABLE stg.weather_kriw;
     INSERT INTO stg.weather_kriw
     SELECT DISTINCT
         TO_TIMESTAMP(local_time, 'DD.MM.YYYY HH24:MI:SS') as local_time,
@@ -181,4 +179,4 @@ load_weather_kriw = SQLExecuteQueryOperator(
     dag=dag
 )
 
-start >> create_stg_tables >> load_weather_kgcc >> load_weather_kjac >> load_weather_klar >> load_weather_kriw >> end
+create_stg_tables >> load_airports >> load_weather_kgcc >> load_weather_kjac >> load_weather_klar >> load_weather_kriw

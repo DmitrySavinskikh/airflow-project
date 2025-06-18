@@ -24,9 +24,9 @@ MAX_RETRIES = 3
     tags=['team_21'],
 )
 def flights_to_dds_dag():
-
+    # таска создания 2х таблиц с завершенными и отмёнными рейсами
     @task
-    def create_dds_schema():
+    def create_dds_table():
         sql = """       
         DROP TABLE IF EXISTS dds.completed_flights;
         CREATE TABLE dds.completed_flights (
@@ -71,12 +71,13 @@ def flights_to_dds_dag():
                 END
             ) STORED,
             processed_dttm TIMESTAMPTZ DEFAULT NOW(),
-            CONSTRAINT uniq_cancellation UNIQUE (carrier_flight_num, scheduled_dep_tm, origin_airport_dk, origin_airport_dk)
+            CONSTRAINT uniq_cancellation UNIQUE (carrier_flight_num, scheduled_dep_tm, origin_airport_dk)
         );
         """
         hook = PostgresHook(postgres_conn_id=PG_CONN_ID)
         hook.run(sql)
 
+    # таска загрузки данных в таблицу с завершенными рейсами
     @task
     def load_completed_flights():
         sql = """
@@ -149,6 +150,7 @@ def flights_to_dds_dag():
         hook = PostgresHook(postgres_conn_id=PG_CONN_ID)
         hook.run(sql, parameters=(tuple(TEAM_AIRPORTS),))
 
+    # таска загрузки данных в таблицу с отмёнными рейсами
     @task
     def load_cancelled_flights():
         sql = """
@@ -161,22 +163,26 @@ def flights_to_dds_dag():
             cancellation_code
         )
         SELECT
-            f.carrier_flight_number,
-            (f.flight_dt || ' ' || f.scheduled_dep_tm)::timestamp AT TIME ZONE COALESCE(a.timezone, 'UTC'),
-            f.origin_code,
-            f.dest_code,
+            f.carrier_flight_num,
+            concat(flight_date::text, 
+                        ' ', 
+                        case when length(div(scheduled_dep_tm, 100)::text) = 1 then concat('0', div(scheduled_dep_tm, 100)::text) else div(scheduled_dep_tm, 100)::text end, 
+                        ':', 
+                        case when length(mod(scheduled_dep_tm, 100)::text) = 1 then '00' else mod(scheduled_dep_tm, 100)::text end,
+                        ':00.000'
+                )::timestamp as sched_dttm_local,
+            f.origin_airport_dk,
+            f.dest_airport_dk,
             f.carrier_code,
             f.cancellation_code
         FROM stg.flights f
-        LEFT JOIN dds_dict.dict_airports a ON a.iata_code = f.origin_code
-        WHERE f.cancelled_flg = 'Y'
-            AND f.origin_code IN ('JAC', 'LAR', 'GCC', 'RIW')
-            ON CONFLICT (carrier_flight_num, scheduled_dep_tm, origin_airport_dk) 
-            DO NOTHING;
+        LEFT JOIN dds_dict.dict_airports a ON a.iata_code = f.origin_airport_dk
+        WHERE f.cancelled_flag is true
+            AND f.origin_airport_dk IN ('JAC', 'LAR', 'GCC', 'RIW')
         """
         hook = PostgresHook(postgres_conn_id=PG_CONN_ID)
         hook.run(sql, parameters=(tuple(TEAM_AIRPORTS),))
 
-    create_dds_schema() >> load_completed_flights() >> load_cancelled_flights()
+    create_dds_table() >> load_completed_flights() >> load_cancelled_flights()
 
 flights_dag = flights_to_dds_dag()

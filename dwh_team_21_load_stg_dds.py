@@ -2,9 +2,6 @@ import datetime
 import logging
 
 from airflow import DAG
-from airflow.providers.postgres.hooks.postgres import PostgresHook
-from airflow.operators.dummy import DummyOperator
-from airflow.operators.python import PythonOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
 
@@ -26,9 +23,6 @@ dag = DAG(
     description="extraction data from stg to dds",
     tags=["team_21"]
 )
-
-start = DummyOperator(task_id='start', dag=dag)
-end = DummyOperator(task_id='end', dag=dag)
 
 create_dds_airports = SQLExecuteQueryOperator(
     task_id='create_dds_airports',
@@ -52,6 +46,7 @@ load_dds_airports = SQLExecuteQueryOperator(
     task_id='load_dds_airports',
     conn_id='con_dwh_2024_s086',
     sql="""
+        -- fill dict_airports table
         INSERT INTO dds_dict.dict_airports (id, ident, type, name, icao_code, iata_code)
         SELECT
             id,
@@ -70,7 +65,7 @@ create_dds_weather = SQLExecuteQueryOperator(
     conn_id='con_dwh_2024_s086',
     sql="""
     -- Create weather table in DDS (added scd2);
-    DROP TABLE IF EXISTS dds.h2_weather
+    DROP TABLE IF EXISTS dds.h2_weather;
     CREATE TABLE dds.h2_weather (
         hash_key TEXT PRIMARY KEY,
         airport_rk TEXT,
@@ -98,6 +93,7 @@ load_dds_weather = SQLExecuteQueryOperator(
     task_id='load_dds_weather',
     conn_id='con_dwh_2024_s086',
     sql="""
+    -- fill h2_weather table
     with scd2_weather_kgcc as (
 select 
 	'KGCC' as airport_rk,
@@ -207,4 +203,4 @@ from union_tbls ut
     dag=dag
 )
 
-start >> create_dds_airports >> load_dds_airports >> create_dds_weather >> load_dds_weather >> end
+create_dds_airports >> load_dds_airports >> create_dds_weather >> load_dds_weather

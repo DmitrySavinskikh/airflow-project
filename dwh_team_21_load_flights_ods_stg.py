@@ -2,7 +2,7 @@ from datetime import datetime
 from airflow.decorators import dag, task
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
-
+# указание папок с местоположением
 S3_BUCKET = 'db01-content'
 FLIGHT_PREFIX = 'flights/T_ONTIME_REPORTING'
 POSTGRES_CONN_ID = 'con_dwh_2024_s086'
@@ -18,7 +18,7 @@ MONTHS_TO_LOAD = 6  # январь-июнь 2024
     tags=["team_21"]
 )
 def load_flights_to_stg_dag():
-
+    # таска создания единой таблицы полётов 
     @task
     def create_stg_table():
         sql = """
@@ -50,6 +50,7 @@ def load_flights_to_stg_dag():
         pg_hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
         pg_hook.run(sql)
 
+    # таска загрузки данных в таблицу полётов
     @task
     def transform_and_load_to_stg():
         sql = """

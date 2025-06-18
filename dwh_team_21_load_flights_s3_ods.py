@@ -20,7 +20,7 @@ MONTHS_TO_LOAD = 6  # Январь-Июнь 2024
     tags=['team_21']
 )
 def load_flights_to_ods_dag():
-
+    # таска создания единой таблицы полётов 
     @task
     def create_ods_table():
         sql = """
@@ -62,6 +62,7 @@ def load_flights_to_ods_dag():
         pg_hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
         pg_hook.run(sql)
 
+    # таска загрузки данных в таблицу полётов
     @task
     def load_to_ods():
         s3_hook = S3Hook(aws_conn_id=AWS_CONN_ID)
