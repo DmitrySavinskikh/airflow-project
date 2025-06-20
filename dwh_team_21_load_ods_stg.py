@@ -36,73 +36,73 @@ create_stg_tables = SQLExecuteQueryOperator(
     -- Create airports table in STG (same structure as ODS)
     DROP TABLE IF EXISTS stg.airports_data;
     CREATE TABLE stg.airports_data (
-        id INTEGER default null,
-        ident TEXT default null,
-        type TEXT default null,
-        name TEXT default null,
-        icao_code TEXT default null,
-        iata_code TEXT default null
+        id INTEGER,
+        ident TEXT,
+        type TEXT,
+        name TEXT,
+        icao_code TEXT default 'Unknown',
+        iata_code TEXT default 'Unknown'
     );
     
     -- Create weather tables in STG with transformed structure
     DROP TABLE IF EXISTS stg.weather_kgcc;
     CREATE TABLE stg.weather_kgcc (
-        local_time TIMESTAMP default null,
-        air_temperature decimal(4,1) default null,
-        pressure_ground decimal(5,1) default null,
-        pressure_sea decimal(5,1) default null,
-        humidity integer default null,
-        mean_wind text default null,
-        wind_speed integer default null,
-        wind_speed_10_m text default null,
-        description_rain text default null,
-        descr_vision text default null,
-        horiz_vision decimal(4,1) default null
+        local_time TIMESTAMP,
+        air_temperature decimal(4,1),
+        pressure_ground decimal(5,1),
+        pressure_sea decimal(5,1),
+        humidity integer,
+        mean_wind text,
+        wind_speed integer,
+        wind_speed_10_m text,
+        description_rain text default 'no rain',
+        descr_vision text,
+        horiz_vision decimal(4,1)
     );
 
     DROP TABLE IF EXISTS stg.weather_kjac;
     CREATE TABLE stg.weather_kjac (
-        local_time TIMESTAMP default null,
-        air_temperature decimal(4,1) default null,
-        pressure_ground decimal(5,1) default null,
-        pressure_sea decimal(5,1) default null,
-        humidity integer default null,
-        mean_wind text default null,
-        wind_speed integer default null,
-        wind_speed_10_m text default null,
-        description_rain text default null,
-        descr_vision text default null,
-        horiz_vision decimal(4,1) default null
+        local_time TIMESTAMP,
+        air_temperature decimal(4,1),
+        pressure_ground decimal(5,1),
+        pressure_sea decimal(5,1),
+        humidity integer,
+        mean_wind text,
+        wind_speed integer,
+        wind_speed_10_m text,
+        description_rain text default 'no rain',
+        descr_vision text,
+        horiz_vision decimal(4,1)
     );
 
     DROP TABLE IF EXISTS stg.weather_klar;
     CREATE TABLE stg.weather_klar (
-        local_time TIMESTAMP default null,
-        air_temperature decimal(4,1) default null,
-        pressure_ground decimal(5,1) default null,
-        pressure_sea decimal(5,1) default null,
-        humidity integer default null,
-        mean_wind text default null,
-        wind_speed integer default null,
-        wind_speed_10_m text default null,
-        description_rain text default null,
-        descr_vision text default null,
-        horiz_vision decimal(4,1) default null
+        local_time TIMESTAMP,
+        air_temperature decimal(4,1),
+        pressure_ground decimal(5,1),
+        pressure_sea decimal(5,1),
+        humidity integer,
+        mean_wind text,
+        wind_speed integer,
+        wind_speed_10_m text,
+        description_rain text default 'no rain',
+        descr_vision text,
+        horiz_vision decimal(4,1)
     );
 
     DROP TABLE IF EXISTS stg.weather_kriw;
     CREATE TABLE stg.weather_kriw (
-        local_time TIMESTAMP default null,
-        air_temperature decimal(4,1) default null,
-        pressure_ground decimal(5,1) default null,
-        pressure_sea decimal(5,1) default null,
-        humidity integer default null,
-        mean_wind text default null,
-        wind_speed integer default null,
-        wind_speed_10_m text default null,
-        description_rain text default null,
-        descr_vision text default null,
-        horiz_vision decimal(4,1) default null
+        local_time TIMESTAMP,
+        air_temperature decimal(4,1),
+        pressure_ground decimal(5,1),
+        pressure_sea decimal(5,1),
+        humidity integer,
+        mean_wind text,
+        wind_speed integer,
+        wind_speed_10_m text,
+        description_rain text default 'no rain',
+        descr_vision text,
+        horiz_vision decimal(4,1)
     );
     """,
     dag=dag
